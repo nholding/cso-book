@@ -10,6 +10,7 @@ import (
 
 // TradeBreakdown represents a single month slice of a multi-month trade.
 // For example, if we sell Q1 2026 (covering Jan–Mar), we will have 3 TradeBreakdowns: one for each month.
+// Include in TradeBreakdown only what is needed for reporting and monthly calculations.
 //
 // Each breakdown is calculated independently, with its own value
 // (Volume * Price).

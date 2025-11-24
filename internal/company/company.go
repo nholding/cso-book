@@ -8,16 +8,17 @@ import (
 )
 
 type Company struct {
-	ID          string          `json:"id"`           // Stable ULID (primary key)
-	BusinessKey string          `json:"business_key"` // Deterministic hash for deduplication
-	Version     string          `json:"version"`      // ID generation version, e.g. "C1"
-	Name        string          `json:"name"`         // Official name, e.g. British Petroleum
-	CommonName  string          `json:"common_name"`  // Common name in the market, e.g. BP
-	DisplayName string          `json:"display_name"`
-	CoCNumber   string          `json:"coc_number"`
-	City        string          `json:"city"`
-	Address     string          `json:"address"`
-	AuditInfo   audit.AuditInfo `json:"audit"`
+	ID              string          `json:"id"`           // Stable ULID (primary key)
+	BusinessKey     string          `json:"business_key"` // Deterministic hash for deduplication
+	Version         string          `json:"version"`      // ID generation version, e.g. "C1"
+	Name            string          `json:"name"`         // Official name, e.g. British Petroleum
+	CommonName      string          `json:"common_name"`  // Common name in the market, e.g. BP
+	DisplayName     string          `json:"display_name"`
+	CoCNumber       string          `json:"coc_number"`
+	City            string          `json:"city"`
+	Address         string          `json:"address"`
+	ContactPersonID string          `json:"contact_person_id"`
+	AuditInfo       audit.AuditInfo `json:"audit"`
 }
 
 // Generate keys
