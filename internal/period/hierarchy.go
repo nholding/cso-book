@@ -1,91 +1,49 @@
 package period
 
-import (
-	"time"
-)
+//This file now contains ONLY utilities related to constructing or
+// managing the PERIOD HIERARCHY (Year → Quarter → Month).
 
+// AddChild
+// Adds a child period to a parent Period struct. Prevents duplicates.
+// This is used while generating periods (typically in
+// GeneratePeriods(startYear, endYear)). It ensures:
+//
+// - No duplicates
+// - Correct structural linking (Year → Quarter, Quarter → Month)
+//
+// Example:
+//
+//	year := Period{ID: "2026", Granularity: CalendarYearPeriod}
+//	AddChild(&year, "2026-Q1")
+//
+// Result:
+//
+//	year.ChildPeriodIDs == ["2026-Q1"]
 func AddChild(parent *Period, childID string) {
 	for _, existing := range parent.ChildPeriodIDs {
 		if existing == childID {
-			return // Child already added -> preventing duplicates
+			return // Prevent duplicates
 		}
 	}
-
 	parent.ChildPeriodIDs = append(parent.ChildPeriodIDs, childID)
 }
 
-// FindPeriodByID searches for a Period in a slice and returns a pointer. Returns nil if no match is found.
+// contains
+// Helper to check membership in a slice
+// Simple helper to check if a slice contains a string.
+
+// This is used by PeriodStore's breakdown functions and kept here
+// because other period-related helpers may use it too.
 //
 // Example:
 //
-//	p := FindPeriodByID(periods, "2026-Q1")
-//	fmt.Println(p.Name) // → "Q1 2026"
-func FindPeriodByID(periods []Period, id string) *Period {
-	for i := range periods {
-		if periods[i].ID == id {
-			return &periods[i]
+//	ok := contains([]string{"A", "B"}, "A") // true
+//	ok := contains([]string{"A", "B"}, "C") // false
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
 		}
 	}
-
-	return nil
-}
-
-// BreakDownTradePeriod converts a higher-level Period (Quarter or Year) into its monthly sub-periods.
-// This is essential for translating trades that span multiple months into individual monthly payments.
-//
-// Example:
-//
-//		months := BreakDownTradePeriod("2026-Q1", periods)
-//	 fmt.Println(months) → ["2026-JAN", "2026-FEB", "2026-MAR"]
-func BreakDownTradePeriod(parentID string, periods []Period) []string {
-	parent := FindPeriodByID(periods, parentID)
-	if parent == nil {
-		return nil
-	}
-
-	// If this is already a month, just return it directly
-	if parent.Granularity == MonthlyPeriod {
-		return []string{parentID}
-	}
-
-	var monthIDs []string
-	for _, childID := range parent.ChildPeriodIDs {
-		child := FindPeriodByID(periods, childID)
-		if child == nil {
-			continue
-		}
-
-		// If the child is a quarter, we recursively dive into its months
-		if child.Granularity == QuarterlyPeriod {
-			monthIDs = append(monthIDs, BreakDownTradePeriod(child.ID, periods)...)
-		} else if child.Granularity == MonthlyPeriod {
-			monthIDs = append(monthIDs, childID)
-		}
-	}
-
-	return monthIDs
-}
-
-// FindPeriodsForDate finds the corresponding Month, Quarter, and Year IDs for a given date.
-// Useful for assigning trades to the correct periods.
-//
-// Example:
-//
-//	m, q, y := FindPeriodsForDate(periods, time.Date(2026, 2, 10, 0, 0, 0, 0, time.UTC))
-//	fmt.Println(m, q, y)
-//	// → "2026-FEB", "2026-Q1", "2026"
-func FindPeriodsForDate(periods []Period, date time.Time) (monthID, quarterID, yearID string) {
-	for _, p := range periods {
-		if date.After(p.StartDate) && date.Before(p.EndDate) || date.Equal(p.StartDate) || date.Equal(p.EndDate) {
-			switch p.Granularity {
-			case MonthlyPeriod:
-				monthID = p.ID
-			case QuarterlyPeriod:
-				quarterID = p.ID
-			case CalendarYearPeriod:
-				yearID = p.ID
-			}
-		}
-	}
-	return
+	return false
 }

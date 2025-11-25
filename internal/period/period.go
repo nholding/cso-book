@@ -2,6 +2,7 @@ package period
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,30 +15,13 @@ import (
 type PeriodGranularity string
 
 const (
-	// MonthlyPeriod represents a single calendar month, e.g. January 2026.
-	MonthlyPeriod PeriodGranularity = "MONTHLY"
-
-	// QuarterlyPeriod represents a three-month quarter, e.g. Q1 2026.
-	QuarterlyPeriod PeriodGranularity = "QUARTERLY"
-
-	// CalendarYearPeriod represents a full calendar year, e.g. Calendar 2026.
+	MonthlyPeriod      PeriodGranularity = "MONTHLY"
+	QuarterlyPeriod    PeriodGranularity = "QUARTERLY"
 	CalendarYearPeriod PeriodGranularity = "CALENDAR"
 )
 
 // Period defines a specific period of time for purchases and sales. It represents 'Years', 'Quarters', and 'Months.
-// It includes a start and end date as well as a label for easy identification.
 // The `ID` field is included to uniquely identify the period for reference purposes.
-//
-// This is intentionally generic so that the same struct can represent:
-// - A single month (e.g., January 2026)
-// - A quarter (e.g., Q2 2026)
-// - A full calendar year (e.g., CAL 2026)
-//
-// Fields:
-//   - StartDate: The start of the period (e.g., 2026-01-01)
-//   - EndDate: The end of the period (e.g., 2026-03-31)
-//   - Granularity: Type of the period (monthly, quarterly, calendar)
-//   - Label: Human-readable name (e.g., "Q1 2026" or "January 2026")
 //
 // Periods form a strict parent-child hierarchy:
 //
@@ -49,11 +33,6 @@ const (
 //	  ├── Q2-2026
 //	  ├── Q3-2026
 //	  └── Q4-2026
-//
-// Each `Period` has:
-// - A unique ID (e.g., "JAN-2026" or "Q1-2026")
-// - StartDate and EndDate covering that period fully (inclusive)
-// - Optional ParentPeriodID (nil for top-level years)
 //
 // Period represents a generic time unit in the trading calendar.
 type Period struct {
@@ -68,40 +47,61 @@ type Period struct {
 	AuditInfo      audit.AuditInfo `json:"audit"`
 }
 
+// PeriodRange represents a range of periods for a trade. PeriodRange allows a Trade to span multiple periods (e.g., Q1 + Q2)
+// It allows a trade to span multiple months, quarters, or even years.
+//
+// Example usage:
+//
+//	// Single quarter trade
+//	pr1 := PeriodRange{
+//	    StartPeriodID: "2026-Q1",
+//	    EndPeriodID:   "2026-Q1",
+//	}
+//
+//	// Multi-quarter trade (Q1+Q2)
+//	pr2 := PeriodRange{
+//	    StartPeriodID: "2026-Q1",
+//	    EndPeriodID:   "2026-Q2",
+//	}
+type PeriodRange struct {
+	StartPeriodID string // ID of the starting period (e.g., "2026-Q1")
+	EndPeriodID   string // ID of the ending period (e.g., "2026-Q2")
+}
+
+// GeneratePeriods creates years, quarters, and months for a range of years.
+//
+// Example:
+//
+//	periods := GeneratePeriods(2026, 2026)
+//
+//	// Outcome (IDs):
+//	// "2026" -> year
+//	// "2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4" -> quarters
+//	// "2026-JAN", "2026-FEB", "2026-MAR", ... -> months
 func GeneratePeriods(startYear, endYear int) []Period {
 	var periods []Period
 	systemUser := "system@internal.local"
-
-	// --- periodMap for quick parent lookup ---
-	// Maps period ID -> pointer to Period object in periods slice
-	periodMap := make(map[string]*Period)
-
-	// --- Loop through each year ---
 	for y := startYear; y <= endYear; y++ {
 		yearID := fmt.Sprintf("%d", y)
 		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.UTC)
 		yearEnd := time.Date(y+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
-		// Create year period
 		yearPeriod := Period{
 			ID:             yearID,
 			Name:           fmt.Sprintf("%d", y),
 			Granularity:    CalendarYearPeriod,
 			ParentPeriodID: nil,
-			ChildPeriodIDs: []string{}, // will populate with quarters
+			ChildPeriodIDs: []string{},
 			StartDate:      yearStart,
 			EndDate:        yearEnd,
 			AuditInfo:      *audit.NewAuditInfo(systemUser),
 		}
-
-		// Append year period to slice and map
 		periods = append(periods, yearPeriod)
-		periodMap[yearID] = &periods[len(periods)-1] // pointer to the slice element
 
-		// --- Generate Quarters for this Year ---
+		// Generate quarters
 		for q := 1; q <= 4; q++ {
-			qID := fmt.Sprintf("%d-Q%d", y, q)         // e.g., "2025-Q1"
-			qStart := yearStart.AddDate(0, (q-1)*3, 0) // Start of quarter
+			qID := fmt.Sprintf("%d-Q%d", y, q)
+			qStart := yearStart.AddDate(0, (q-1)*3, 0)
 			qEnd := qStart.AddDate(0, 3, 0).Add(-time.Nanosecond)
 
 			quarterPeriod := Period{
@@ -109,46 +109,36 @@ func GeneratePeriods(startYear, endYear int) []Period {
 				Name:           fmt.Sprintf("Q%d %d", q, y),
 				Granularity:    QuarterlyPeriod,
 				ParentPeriodID: &yearID,
-				ChildPeriodIDs: []string{}, // will populate with months
+				ChildPeriodIDs: []string{},
 				StartDate:      qStart,
 				EndDate:        qEnd,
 				AuditInfo:      *audit.NewAuditInfo(systemUser),
 			}
 
-			// --- Generate Months for this Quarter ---
+			// Generate months
 			for m := 0; m < 3; m++ {
 				monthStart := qStart.AddDate(0, m, 0)
 				monthEnd := monthStart.AddDate(0, 1, 0).Add(-time.Nanosecond)
-				monthID := strings.ToUpper(monthStart.Format("2006-Jan")) // e.g., "2025-JAN"
+				monthID := strings.ToUpper(monthStart.Format("2006-Jan"))
 
 				monthPeriod := Period{
 					ID:             monthID,
-					Name:           monthStart.Format("January 2006"), // e.g., "January 2025"
+					Name:           monthStart.Format("January 2006"),
 					Granularity:    MonthlyPeriod,
 					ParentPeriodID: &qID,
-					ChildPeriodIDs: []string{}, // months have no children
+					ChildPeriodIDs: []string{},
 					StartDate:      monthStart,
 					EndDate:        monthEnd,
 					AuditInfo:      *audit.NewAuditInfo(systemUser),
 				}
 
-				// Append month to slice and map
-				periods = append(periods, monthPeriod)
-				periodMap[monthID] = &periods[len(periods)-1]
-
-				// Link month to parent quarter
 				quarterPeriod.ChildPeriodIDs = append(quarterPeriod.ChildPeriodIDs, monthID)
+				periods = append(periods, monthPeriod)
 			}
 
-			// Append quarter to slice and map
+			yearPeriod.ChildPeriodIDs = append(yearPeriod.ChildPeriodIDs, qID)
 			periods = append(periods, quarterPeriod)
-			periodMap[qID] = &periods[len(periods)-1]
-
-			// Link quarter to parent year
-			yearPtr := periodMap[yearID]
-			yearPtr.ChildPeriodIDs = append(yearPtr.ChildPeriodIDs, qID)
 		}
 	}
-
 	return periods
 }
