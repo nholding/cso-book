@@ -33,8 +33,6 @@ const (
 //	  ├── Q2-2026
 //	  ├── Q3-2026
 //	  └── Q4-2026
-//
-// Period represents a generic time unit in the trading calendar.
 type Period struct {
 	ID             string            // Unique period identifier (e.g., "2026-Q1")
 	Name           string            // Human-readable label (e.g., "Q1 2026")
@@ -47,7 +45,7 @@ type Period struct {
 	AuditInfo      audit.AuditInfo `json:"audit"`
 }
 
-// PeriodRange represents a range of periods for a trade. PeriodRange allows a Trade to span multiple periods (e.g., Q1 + Q2)
+// PeriodRange represents a range of Periods for a trade. PeriodRange allows a Trade to span multiple periods (e.g., Q1 + Q2)
 // It allows a trade to span multiple months, quarters, or even years.
 //
 // Example usage:

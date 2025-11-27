@@ -1,66 +1,14 @@
 package trade
 
 import (
-	"github.com/google/uuid"
 	"github.com/nholding/cso-book/internal/audit"
 	"github.com/nholding/cso-book/internal/period"
 	"time"
 )
 
-// TradeBase
-// Common fields for both Purchases and Sales. Includes PeriodRange.
-//
-// Example:
-//
-//	tb := TradeBase{
-//	    ID: "T1",
-//	    PeriodRange: period.PeriodRange{
-//	        StartPeriodID: "2026-Q1",
-//	        EndPeriodID: "2026-Q2",
-//	    },
-//	    VolumeMT: 10000,
-//	    PricePerMT: 3.5,
-//	    Currency: "EUR",
-//	}
-type TradeBase struct {
-	ID          string
-	PeriodRange period.PeriodRange
-	VolumeMT    float64
-	PricePerMT  float64
-	Currency    string
-	AuditInfo   audit.AuditInfo
-}
-
-// Purchase
-// Represents a purchase trade. Distinctive type from Sale.
-//
-// Example:
-//
-//	p := Purchase{
-//	    TradeBase: tb,
-//	    SupplierID: "COMPANY-123",
-//	}
-type Purchase struct {
-	TradeBase
-	SupplierID string
-}
-
-// Sale
-// Represents a sale trade. Distinctive type from Purchase.
-//
-// Example:
-//
-//	s := Sale{
-//	    TradeBase: tb,
-//	    BuyerID: "COMPANY-456",
-//	}
-type Sale struct {
-	TradeBase
-	BuyerID string
-}
-
 // TradeBreakdown
-// Represents a single monthly slice of a trade.
+// Represents a single monthly slice of a trade. Every breakdown row is permanently linked to its parent trade
+// via ParentTradeID and always represents a *single month*.
 // Example:
 //
 //	bd := TradeBreakdown{
@@ -74,15 +22,15 @@ type Sale struct {
 type TradeBreakdown struct {
 	ID            string
 	BusinessKey   string
-	ParentTradeID string
+	ParentTradeID string // Links back to the original Purchase/Sale
 	PeriodID      string
 	StartDate     time.Time
 	EndDate       time.Time
 	VolumeMT      float64
 	PricePerMT    float64
 	Currency      string
-	Proceed       float64
-	AuditInfo     audit.AuditInfo
+	TotalAmount   float64
+	AuditInfo     audit.AuditInfo // Inherit from parent trade
 }
 
 // CreateTradeBreakdowns generates monthly breakdowns for a trade,
@@ -143,10 +91,10 @@ func CreateTradeBreakdowns(trade TradeBase, ps *period.PeriodStore, createdBy st
 		// Here, we simply use the full trade volume for each month in the range
 		// There are no fractional calculations since we’re dealing with full months only
 		volume := trade.VolumeMT
-		value := volume * trade.PricePerMT // Total value for the entire month
+		totalAmount := volume * trade.PricePerMT // Total value for the entire month
 
 		bd := TradeBreakdown{
-			ID:            uuid.NewString(),
+			ID:            "TBTestID",
 			ParentTradeID: trade.ID,
 			PeriodID:      p.ID,
 			StartDate:     p.StartDate,
@@ -154,8 +102,8 @@ func CreateTradeBreakdowns(trade TradeBase, ps *period.PeriodStore, createdBy st
 			VolumeMT:      volume,
 			PricePerMT:    trade.PricePerMT,
 			Currency:      trade.Currency,
-			Proceed:       value,
-			AuditInfo:     *audit.NewAuditInfo(createdBy),
+			TotalAmount:   totalAmount,
+			AuditInfo:     trade.AuditInfo,
 		}
 
 		// Append the breakdown for this month to the result slice
