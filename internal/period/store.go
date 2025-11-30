@@ -1,5 +1,9 @@
 package period
 
+import (
+	"sort"
+)
+
 // PeriodStore stores/caches all periods in memory for fast lookups and efficient breakdowns.
 // Intended to reduce RDS queries: load all periods at app startup.
 //
