@@ -38,7 +38,7 @@ type Period struct {
 	Name           string            // Human-readable label (e.g., "Q1 2026")
 	Granularity    PeriodGranularity // Granularity of the period (Monthly, quarterly, Calendar)
 	ParentPeriodID *string           // / Points to parent (Quarter → Year, Month → Quarter)
-	ChildPeriodIDs []string          // IDs of child periods (e.g., year has quarters, quarter has months
+	ChildPeriodIDs []string          // IDs of child periods (e.g., year has quarters, quarter has months); not stored in the DB
 	StartDate      time.Time         // Period start (UTC, inclusive)
 	EndDate        time.Time         // Period end (UTC, inclusive)
 	CreatedBy      string
@@ -79,6 +79,7 @@ type PeriodRange struct {
 func GeneratePeriods(startYear, endYear int) []Period {
 	var periods []Period
 	systemUser := "system@internal.local"
+
 	for y := startYear; y <= endYear; y++ {
 		yearID := fmt.Sprintf("%d", y)
 		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.UTC)
