@@ -1,8 +1,8 @@
-package period
+package domain
 
 import (
 	"fmt"
-	"sort"
+	//	"sort"
 	"strings"
 	"time"
 
@@ -10,8 +10,7 @@ import (
 )
 
 // PeriodGranularity identifies the logical resolution of a Period, defines what kind of period a trade covers.
-// It allows you to filter or aggregate trades differently
-// based on whether they are monthly, quarterly, or yearly deals.
+// It allows you to filter or aggregate trades differently based on whether they are monthly, quarterly, or yearly deals.
 type PeriodGranularity string
 
 const (
@@ -41,8 +40,7 @@ type Period struct {
 	ChildPeriodIDs []string          // IDs of child periods (e.g., year has quarters, quarter has months); not stored in the DB
 	StartDate      time.Time         // Period start (UTC, inclusive)
 	EndDate        time.Time         // Period end (UTC, inclusive)
-	CreatedBy      string
-	AuditInfo      audit.AuditInfo `json:"audit"`
+	AuditInfo      *audit.AuditInfo
 }
 
 // PeriodRange represents a range of Periods for a trade. PeriodRange allows a Trade to span multiple periods (e.g., Q1 + Q2)
@@ -140,4 +138,44 @@ func GeneratePeriods(startYear, endYear int) []Period {
 		}
 	}
 	return periods
+}
+
+// Validate checks the period for consistency and returns an error if invalid.
+func (p *Period) Validate() error {
+	if p.ID == "" {
+		fmt.Errorf("period ID cannot be empty")
+	}
+	if p.Name == "" {
+		return fmt.Errorf("period name cannot be empty")
+	}
+	if p.Granularity != "CALENDAR" && p.Granularity != "QUARTERLY" && p.Granularity != "MONTHLY" {
+		return fmt.Errorf("invalid granularity, must be CALENDAR, QUARTERLY, or MONTHLY")
+	}
+	if !p.StartDate.Before(p.EndDate) {
+		return fmt.Errorf("start date must be before end date")
+	}
+	return nil
+}
+
+// GranularityRank
+// Purpose:
+//
+//	Maps granularity enums to numeric ranks to allow
+//	consistent comparisons such as:
+//
+//	     MONTHLY (1) < QUARTERLY (2) < CALENDAR (3)
+//
+// Used by hierarchy validation.
+// ================================================
+func (p *Period) GranularityRank() int {
+	switch p.Granularity {
+	case GranularityMonthly:
+		return 1
+	case GranularityQuarterly:
+		return 2
+	case GranularityCalendar:
+		return 3
+	default:
+		return 99 // any unknown granularity is considered invalid
+	}
 }

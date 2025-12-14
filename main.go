@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"os"
 
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/nholding/cso-book/internal/repository"
+	//	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/nholding/cso-book/internal/period/repository"
+	"github.com/nholding/cso-book/internal/period/service"
+	"github.com/nholding/cso-book/internal/platform/awsclient"
 )
 
 func main() {
@@ -15,7 +19,7 @@ func main() {
 
 	fmt.Println("Hello World")
 
-	config := repository.Config{
+	config := awsclient.Config{
 		Profile:      "productionadmin",
 		S3BucketName: "terraform-tfstate-production-nh",
 		Region:       "eu-central-1",
@@ -26,17 +30,34 @@ func main() {
 		DBPort: 5432,
 	}
 
-	client, err := repository.NewAWSClients(&config)
+	rdsRepo, err := repository.NewRdsPeriodRepository(&config)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("error creating RDS client: %v", err)
 	}
 
-	output, _ := client.S3.Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
-		Bucket: &client.S3.BucketName,
-	})
+	periodService := service.NewPeriodService(rdsRepo)
 
-	fmt.Println(output)
+	if err := periodService.InitializePeriods(context.TODO(), 2026, 2027); err != nil {
+		log.Fatalf("error initialising periods: %v", err)
+	}
 
-	fmt.Println(client)
+	oErrs := periodService.ValidateOverlaps()
+	if len(oErrs) > 0 {
+		fmt.Println("❌ Period overlaps detected! Application cannot continue.")
+		for _, e := range oErrs {
+			fmt.Println("   →", e)
+		}
+		os.Exit(1)
+	}
+
+	hErrs := periodService.ValidateHierarchy()
+	if len(hErrs) > 0 {
+		fmt.Println("❌ Invalid period hierarchy detected! Application cannot continue.")
+		for _, e := range hErrs {
+			fmt.Println("   →", e)
+		}
+		// Terminate application (fail fast)
+		os.Exit(1)
+	}
 
 }

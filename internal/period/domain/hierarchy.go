@@ -1,4 +1,4 @@
-package period
+package domain
 
 //This file now contains ONLY utilities related to constructing or
 // managing the PERIOD HIERARCHY (Year → Quarter → Month).

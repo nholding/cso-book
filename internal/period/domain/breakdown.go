@@ -1,4 +1,4 @@
-package period
+package domain
 
 // BreakDownTradePeriodRange
 // The core function of BreakDownTradePeriodRange is to take a PeriodRange
