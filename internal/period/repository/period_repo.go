@@ -53,11 +53,15 @@ func (p *RdsPeriodRepository) SavePeriods(ctx context.Context, periods []*domain
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO periods (
-			id, name, granularity, parent_period_id, start_date, end_date,
+			id, name, calendar, granularity, parent_period_id, start_date, end_date,
 			audit_created_by, audit_created_at, audit_updated_by, audit_updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, $11)
 	`)
 	if err != nil {
 		tx.Rollback()
@@ -66,6 +70,10 @@ func (p *RdsPeriodRepository) SavePeriods(ctx context.Context, periods []*domain
 	defer stmt.Close()
 
 	for _, p := range periods {
+		if p == nil {
+			continue
+		}
+
 		if err := p.Validate(); err != nil {
 			return fmt.Errorf("period %s validation failed: %w", p.ID, err)
 		}
@@ -73,6 +81,7 @@ func (p *RdsPeriodRepository) SavePeriods(ctx context.Context, periods []*domain
 		_, err := stmt.ExecContext(ctx,
 			p.ID,
 			p.Name,
+			p.Calendar,
 			p.Granularity,
 			p.ParentPeriodID,
 			p.StartDate,
@@ -83,7 +92,6 @@ func (p *RdsPeriodRepository) SavePeriods(ctx context.Context, periods []*domain
 			p.AuditInfo.UpdatedAt,
 		)
 		if err != nil {
-			tx.Rollback()
 			return fmt.Errorf("failed to insert period %s: %w", p.ID, err)
 		}
 	}

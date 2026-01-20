@@ -17,7 +17,7 @@ package domain
 //	}
 //	months := ps.BreakDownTradePeriodRange(pr)
 //
-// Output: [ "2026-JAN", "2026-FEB", "2026-MAR", "2026-APR", "2026-MAY", "2026-JUN"]
+// Output: [ "2026-JAN", "2026-FEB", "2026-MAR", "2026-APR", "2026-MAY", "2026-JUN" ]
 func (ps *PeriodStore) BreakDownTradePeriodRange(pr PeriodRange) []string {
 	startPeriod := ps.FindByID(pr.StartPeriodID)
 	endPeriod := ps.FindByID(pr.EndPeriodID)
@@ -27,20 +27,21 @@ func (ps *PeriodStore) BreakDownTradePeriodRange(pr PeriodRange) []string {
 		return nil
 	}
 
-	// Step 1: Determine actual start and end dates
-	startDate := startPeriod.StartDate
-	endDate := endPeriod.EndDate
+	// Guard against reversed ranges (start after end)
+	if startPeriod.StartDate.After(endPeriod.EndDate) {
+		return nil
+	}
 
-	// Prepare a slice to collect the month IDs that fall within the period range
+	// Prepare a slice to collect the month IDs that fall fully within the period range
 	var monthIDs []string
+
 	for _, m := range ps.Months {
-		// We simply check if the month's start date is between the start and end period's range
-		// We do not need to worry about partial months because all trades are for full months.
-		// This ensures that a trade is evenly spread across the months in the range.
-		if !m.StartDate.Before(startDate) && !m.StartDate.After(endDate) {
-			// If the month's start date is within the range, add it to the result list
+		// A month is included IFF it is fully contained in the range:
+		//   month.Start >= range.Start AND month.End <= range.End
+		if !m.StartDate.Before(startPeriod.StartDate) && !m.EndDate.After(endPeriod.EndDate) {
 			monthIDs = append(monthIDs, m.ID)
 		}
 	}
+
 	return monthIDs
 }

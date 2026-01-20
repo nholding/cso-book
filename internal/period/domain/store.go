@@ -27,13 +27,12 @@ type PeriodStore struct {
 //	periods := GeneratePeriods(2026, 2026)
 //	store := NewPeriodStore(periods)
 //	jan := store.FindByID("2026-JAN")
-func NewPeriodStore(periods []Period) *PeriodStore {
+func NewPeriodStore(periods []*Period) *PeriodStore {
 	store := &PeriodStore{
 		Periods: make(map[string]*Period),
 	}
 
-	for i := range periods {
-		p := &periods[i]
+	for _, p := range periods {
 		store.Periods[p.ID] = p
 
 		switch p.Granularity {
@@ -50,16 +49,43 @@ func NewPeriodStore(periods []Period) *PeriodStore {
 	sort.Slice(store.Months, func(i, j int) bool {
 		return store.Months[i].StartDate.Before(store.Months[j].StartDate)
 	})
-	// Sort Quarters by StartDate
+
 	sort.Slice(store.Quarters, func(i, j int) bool {
 		return store.Quarters[i].StartDate.Before(store.Quarters[j].StartDate)
 	})
-	// Sort Years by StartDate
+
 	sort.Slice(store.Years, func(i, j int) bool {
 		return store.Years[i].StartDate.Before(store.Years[j].StartDate)
 	})
 
 	return store
+}
+
+// SortAll
+//
+//	Sorts all PeriodStore slices (Months, Quarters, Years) chronologically by StartDate.
+//
+// When to call:
+//   - After manually adding periods to the store
+//   - After generating fiscal years/quarters dynamically
+//
+// Notes:
+//   - Sorting Months is critical for correct behavior of
+//     BreakDownTradePeriodRange.
+//   - Sorting Years and Quarters ensures validation and
+//     traversal logic works predictably.
+func (ps *PeriodStore) SortAll() {
+	sort.Slice(ps.Months, func(i, j int) bool {
+		return ps.Months[i].StartDate.Before(ps.Months[j].StartDate)
+	})
+
+	sort.Slice(ps.Quarters, func(i, j int) bool {
+		return ps.Quarters[i].StartDate.Before(ps.Quarters[j].StartDate)
+	})
+
+	sort.Slice(ps.Years, func(i, j int) bool {
+		return ps.Years[i].StartDate.Before(ps.Years[j].StartDate)
+	})
 }
 
 // FindByID retrieves a period pointer by ID

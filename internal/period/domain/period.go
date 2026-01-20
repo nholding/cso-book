@@ -9,6 +9,8 @@ import (
 	"github.com/nholding/cso-book/internal/audit"
 )
 
+type CalendarType string
+
 // PeriodGranularity identifies the logical resolution of a Period, defines what kind of period a trade covers.
 // It allows you to filter or aggregate trades differently based on whether they are monthly, quarterly, or yearly deals.
 type PeriodGranularity string
@@ -17,6 +19,8 @@ const (
 	MonthlyPeriod      PeriodGranularity = "MONTHLY"
 	QuarterlyPeriod    PeriodGranularity = "QUARTERLY"
 	CalendarYearPeriod PeriodGranularity = "CALENDAR"
+	CalendarGregorian  CalendarType      = "CAL" // normal Jan–Dec calendar
+	CalendarFiscal     CalendarType      = "FY"  // fiscal calendar
 )
 
 // Period defines a specific period of time for purchases and sales. It represents 'Years', 'Quarters', and 'Months.
@@ -33,8 +37,9 @@ const (
 //	  ├── Q3-2026
 //	  └── Q4-2026
 type Period struct {
-	ID             string            // Unique period identifier (e.g., "2026-Q1")
-	Name           string            // Human-readable label (e.g., "Q1 2026")
+	ID             string // Unique period identifier (e.g., "2026-Q1")
+	Name           string // Human-readable label (e.g., "Q1 2026")
+	Calendar       CalendarType
 	Granularity    PeriodGranularity // Granularity of the period (Monthly, quarterly, Calendar)
 	ParentPeriodID *string           // / Points to parent (Quarter → Year, Month → Quarter)
 	ChildPeriodIDs []string          // IDs of child periods (e.g., year has quarters, quarter has months); not stored in the DB
@@ -74,8 +79,8 @@ type PeriodRange struct {
 //	// "2026" -> year
 //	// "2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4" -> quarters
 //	// "2026-JAN", "2026-FEB", "2026-MAR", ... -> months
-func GeneratePeriods(startYear, endYear int) []Period {
-	var periods []Period
+func GeneratePeriods(startYear, endYear int) []*Period {
+	var periods []*Period
 	systemUser := "system@internal.local"
 
 	for y := startYear; y <= endYear; y++ {
@@ -83,15 +88,16 @@ func GeneratePeriods(startYear, endYear int) []Period {
 		yearStart := time.Date(y, 1, 1, 0, 0, 0, 0, time.UTC)
 		yearEnd := time.Date(y+1, 1, 1, 0, 0, 0, 0, time.UTC).Add(-time.Nanosecond)
 
-		yearPeriod := Period{
+		yearPeriod := &Period{
 			ID:             yearID,
 			Name:           fmt.Sprintf("%d", y),
+			Calendar:       CalendarGregorian,
 			Granularity:    CalendarYearPeriod,
 			ParentPeriodID: nil,
 			ChildPeriodIDs: []string{},
 			StartDate:      yearStart,
 			EndDate:        yearEnd,
-			AuditInfo:      *audit.NewAuditInfo(systemUser),
+			AuditInfo:      audit.NewAuditInfo(systemUser),
 		}
 		periods = append(periods, yearPeriod)
 
@@ -101,15 +107,16 @@ func GeneratePeriods(startYear, endYear int) []Period {
 			qStart := yearStart.AddDate(0, (q-1)*3, 0)
 			qEnd := qStart.AddDate(0, 3, 0).Add(-time.Nanosecond)
 
-			quarterPeriod := Period{
+			quarterPeriod := &Period{
 				ID:             qID,
 				Name:           fmt.Sprintf("Q%d %d", q, y),
+				Calendar:       CalendarGregorian,
 				Granularity:    QuarterlyPeriod,
 				ParentPeriodID: &yearID,
 				ChildPeriodIDs: []string{},
 				StartDate:      qStart,
 				EndDate:        qEnd,
-				AuditInfo:      *audit.NewAuditInfo(systemUser),
+				AuditInfo:      audit.NewAuditInfo(systemUser),
 			}
 
 			// Generate months
@@ -118,15 +125,16 @@ func GeneratePeriods(startYear, endYear int) []Period {
 				monthEnd := monthStart.AddDate(0, 1, 0).Add(-time.Nanosecond)
 				monthID := strings.ToUpper(monthStart.Format("2006-Jan"))
 
-				monthPeriod := Period{
+				monthPeriod := &Period{
 					ID:             monthID,
 					Name:           monthStart.Format("January 2006"),
+					Calendar:       CalendarGregorian,
 					Granularity:    MonthlyPeriod,
 					ParentPeriodID: &qID,
 					ChildPeriodIDs: []string{},
 					StartDate:      monthStart,
 					EndDate:        monthEnd,
-					AuditInfo:      *audit.NewAuditInfo(systemUser),
+					AuditInfo:      audit.NewAuditInfo(systemUser),
 				}
 
 				quarterPeriod.ChildPeriodIDs = append(quarterPeriod.ChildPeriodIDs, monthID)
@@ -169,11 +177,11 @@ func (p *Period) Validate() error {
 // ================================================
 func (p *Period) GranularityRank() int {
 	switch p.Granularity {
-	case GranularityMonthly:
+	case MonthlyPeriod:
 		return 1
-	case GranularityQuarterly:
+	case QuarterlyPeriod:
 		return 2
-	case GranularityCalendar:
+	case CalendarYearPeriod:
 		return 3
 	default:
 		return 99 // any unknown granularity is considered invalid

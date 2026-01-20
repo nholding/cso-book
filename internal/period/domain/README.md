@@ -59,3 +59,18 @@ Using exclusive end dates avoids multiple categories of bugs and avoids the foll
 * Complicated “end of month” logic
 * Leap year inconsistencie
 * SQL queriers simpler (no need for BETWEEN)
+
+## Gregorian Calendar and Fiscal Year
+Trades are always anchored to real time, not to “calendar type”.
+
+That means:
+* A trade ultimately resolves to a set of Gregorian months
+* Gregorian months are the only atomic units
+* Fiscal years/quarters are named date ranges
+* Everything else (CAL years, CAL quarters, FY years, FY quarters) is just a grouping lens
+
+Fiscal years are selection mechanisms, not ownership models
+They:
+* Define a date range
+* Group months differently
+* Do not redefine what time is

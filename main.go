@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
+	"time"
 
 	//	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/nholding/cso-book/internal/period/domain"
 	"github.com/nholding/cso-book/internal/period/repository"
 	"github.com/nholding/cso-book/internal/period/service"
 	"github.com/nholding/cso-book/internal/platform/awsclient"
@@ -37,27 +38,34 @@ func main() {
 
 	periodService := service.NewPeriodService(rdsRepo)
 
-	if err := periodService.InitializePeriods(context.TODO(), 2026, 2027); err != nil {
+	fy := []domain.FiscalCalendarConfig{{
+		StartYear:  2026,
+		StartMonth: time.April,
+	}}
+
+	if err := periodService.InitializePeriods(context.TODO(), 2026, 2027, fy); err != nil {
 		log.Fatalf("error initialising periods: %v", err)
 	}
 
-	oErrs := periodService.ValidateOverlaps()
-	if len(oErrs) > 0 {
-		fmt.Println("❌ Period overlaps detected! Application cannot continue.")
-		for _, e := range oErrs {
-			fmt.Println("   →", e)
-		}
-		os.Exit(1)
-	}
+	//oErrs := periodService.ValidateOverlaps()
+	//if len(oErrs) > 0 {
+	//	fmt.Println("❌ Period overlaps detected! Application cannot continue.")
+	//	for _, e := range oErrs {
+	//		fmt.Println("   →", e)
+	//	}
+	//	os.Exit(1)
+	//}
 
-	hErrs := periodService.ValidateHierarchy()
-	if len(hErrs) > 0 {
-		fmt.Println("❌ Invalid period hierarchy detected! Application cannot continue.")
-		for _, e := range hErrs {
-			fmt.Println("   →", e)
-		}
-		// Terminate application (fail fast)
-		os.Exit(1)
-	}
+	//hErrs := periodService.ValidateHierarchy()
+	//if len(hErrs) > 0 {
+	//	fmt.Println("❌ Invalid period hierarchy detected! Application cannot continue.")
+	//	for _, e := range hErrs {
+	//		fmt.Println("   →", e)
+	//	}
+	//	// Terminate application (fail fast)
+	//	os.Exit(1)
+	//}
+
+	fmt.Println(periodService.BreakDownTradeRange(domain.PeriodRange{StartPeriodID: "2026-Q1", EndPeriodID: "2027-Q2"}))
 
 }

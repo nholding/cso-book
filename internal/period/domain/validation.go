@@ -34,9 +34,9 @@ func DetectOverlaps(periods []*Period) []string {
 
 	// --- 1. Group periods by granularity -----------------------------------
 	grouped := map[PeriodGranularity][]*Period{
-		Calendar: {},
-		Quarter:  {},
-		Month:    {},
+		CalendarYearPeriod: {},
+		QuarterlyPeriod:    {},
+		MonthlyPeriod:      {},
 	}
 
 	for _, p := range periods {
